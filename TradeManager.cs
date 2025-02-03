@@ -62,8 +62,7 @@ namespace cAlgo.Robots
         // Function to draw the Buy Button
         private void DrawPanel()
         {
-            var tradingPanel = new TradingPanel(this, Symbol);
-
+            var tradingPanel = new TradingPanel(this, Symbol, LotsSize, StopLossPips, TakeProfitPips1);
             var border = new Border 
             {
                 VerticalAlignment = PanelVerticalAlignment,
@@ -77,132 +76,22 @@ namespace cAlgo.Robots
             Chart.AddControl(border);
         }
 
-        // // Function to draw the Sell Button
-        // private void DrawSellButton()
-        // {
-        //     // Clear existing buttons (if any)
-        //     Chart.RemoveObject(SellButtonName);
-
-        //     // Draw a rectangle as the Sell button
-        //     Chart.DrawRectangle(SellButtonName, ChartIconType.Rectangle, ChartIconPosition.TopRight, ButtonWidth, ButtonHeight, Colors.Red);
-
-        //     // Add the text "SELL" to the button
-        //     ChartObjects.DrawText(SellButtonName + "_Label", "SELL", ChartIconPosition.TopRight, Colors.White);
-        // }
-
-        // public void OnBar()
-        // {
-        //     // Check if the Buy Button was clicked
-        //     if (IsButtonClicked(BuyButtonName))
-        //     {
-        //         ExecuteBuyTrade();
-        //     }
-
-        //     // Check if the Sell Button was clicked
-        //     if (IsButtonClicked(SellButtonName))
-        //     {
-        //         ExecuteSellTrade();
-        //     }
-        // }
-
-        // // Function to detect if a button was clicked
-        // private bool IsButtonClicked(string buttonName)
-        // {
-        //     // Get the button object
-        //     var button = ChartObjects.GetObject(buttonName);
-
-        //     if (button != null)
-        //     {
-        //         // Check if the mouse click occurred within the button's boundaries
-        //         var mousePosition = Chart.MousePosition;
-        //         if (mousePosition.X >= button.Left && mousePosition.X <= button.Right &&
-        //             mousePosition.Y >= button.Top && mousePosition.Y <= button.Bottom)
-        //         {
-        //             return true;
-        //         }
-        //     }
-
-        //     return false;
-        // }
-
-        // // Define Layer 1 execution logic
-        // private void ExecuteBuyTrade()
-        // {
-        //     double entryPrice = Symbol.Bid;
-        //     double lotSize = 0.01; // User-defined lot size
-        //     double pointsDistance = 150; // User-defined points distance for subsequent layers
-        //     int numberOfLayers = 3; // Number of layers (you can adjust based on user input)
-
-        //     // Execute Layer 1 buy trade
-        //     var buyOrder = ExecuteMarketOrder(TradeType.Buy, Symbol, lotSize, "Layer1Buy");
-
-        //     // Place pending orders for Layer 2, Layer 3, etc.
-        //     for (int i = 1; i <= numberOfLayers; i++)
-        //     {
-        //         double pendingPrice = entryPrice + (i * pointsDistance * Symbol.TickSize); // Calculate the price for each layer
-        //         ExecutePendingOrder(TradeType.Buy, Symbol, lotSize, pendingPrice, "Layer" + i);
-        //     }
-
-        //     // Optional: Apply stop loss and take profit for Layer 1
-        //     double stopLoss = entryPrice - (500 * Symbol.TickSize); // SL for Layer 1
-        //     double takeProfit = entryPrice + (200 * Symbol.TickSize); // TP for Layer 1
-        //     ModifyOrder(buyOrder, stopLoss, takeProfit);
-        // }
-
-        // private void ExecuteSellTrade()
-        // {
-        //     double entryPrice = Symbol.Ask;
-        //     double lotSize = 0.01; // User-defined lot size
-        //     double pointsDistance = 150; // User-defined points distance for subsequent layers
-        //     int numberOfLayers = 3; // Number of layers (you can adjust based on user input)
-
-        //     // Execute Layer 1 sell trade
-        //     var sellOrder = ExecuteMarketOrder(TradeType.Sell, Symbol, lotSize, "Layer1Sell");
-
-        //     // Place pending orders for Layer 2, Layer 3, etc.
-        //     for (int i = 1; i <= numberOfLayers; i++)
-        //     {
-        //         double pendingPrice = entryPrice - (i * pointsDistance * Symbol.TickSize); // Calculate the price for each layer
-        //         ExecutePendingOrder(TradeType.Sell, Symbol, lotSize, pendingPrice, "Layer" + i);
-        //     }
-
-        //     // Optional: Apply stop loss and take profit for Layer 1
-        //     double stopLoss = entryPrice + (500 * Symbol.TickSize); // SL for Layer 1
-        //     double takeProfit = entryPrice - (200 * Symbol.TickSize); // TP for Layer 1
-        //     ModifyOrder(sellOrder, stopLoss, takeProfit);
-        // }
-
-        // // Function to execute a pending order (buy/sell)
-        // private void ExecutePendingOrder(TradeType tradeType, Symbol symbol, double lotSize, double price, string label)
-        // {
-        //     // Create the pending order
-        //     var pendingOrder = PendingOrders.PlaceOrder(tradeType, symbol, lotSize, price, label);
-        // }
-
-        // // Function to modify an order (to add SL/TP)
-        // private void ModifyOrder(Order order, double stopLoss, double takeProfit)
-        // {
-        //     // Modify the order with the defined stop loss and take profit
-        //     order.ModifyStopLoss(stopLoss);
-        //     order.ModifyTakeProfit(takeProfit);
-        // }
-
         public class TradingPanel : CustomControl
         {
-            // private const string LotsInputKey = "LotsKey";
-            // private const string TakeProfitInputKey = "TPKey";
-            // private const string StopLossInputKey = "SLKey";
             private readonly IDictionary<string, TextBox> _inputMap = new Dictionary<string, TextBox>();
             private readonly Robot _robot;
             private readonly Symbol _symbol;
-            public double LotsSize { get; set; }
-            public double StopLossPips { get; set; }
-            public double TakeProfitPips1 { get; set; }
+            private readonly double _lotsSize;
+            private readonly double _stopLossPips;
+            private readonly double _takeProfitPips1;
 
-            public TradingPanel(Robot robot, Symbol symbol)
+            public TradingPanel(Robot robot, Symbol symbol, double lotsSize, double stopLossPips, double takeProfitPips1)
             {
                 _robot = robot;
                 _symbol = symbol;
+                _lotsSize = lotsSize;
+                _stopLossPips = stopLossPips;
+                _takeProfitPips1 = takeProfitPips1;
                 AddChild(CreateTradingPanel());
             }
 
@@ -219,7 +108,7 @@ namespace cAlgo.Robots
                 return mainPanel;
             }
 
-            private ControlBase CreateHeader()
+            private static ControlBase CreateHeader()
             {
                 var headerBorder = new Border 
                 {
@@ -247,20 +136,11 @@ namespace cAlgo.Robots
                 var grid = new Grid(4, 3);
                 grid.Columns[1].SetWidthInPixels(5);
 
-                var sellButton = CreateTradeButton("SELL", Styles.CreateSellButtonStyle(), TradeType.Sell);
-                grid.AddChild(sellButton, 0, 0);
-
                 var buyButton = CreateTradeButton("BUY", Styles.CreateBuyButtonStyle(), TradeType.Buy);
-                grid.AddChild(buyButton, 0, 2);
+                grid.AddChild(buyButton, 0, 0);
 
-                // var lotsInput = CreateInputWithLabel("Quantity (Lots)", defaultLots.ToString("F2"), LotsInputKey);
-                // grid.AddChild(lotsInput, 1, 0, 1, 3);
-
-                // var stopLossInput = CreateInputWithLabel("Stop Loss (Pips)", defaultStopLossPips.ToString("F1"), StopLossInputKey);
-                // grid.AddChild(stopLossInput, 2, 0);
-
-                // var takeProfitInput = CreateInputWithLabel("Take Profit (Pips)", defaultTakeProfitPips.ToString("F1"), TakeProfitInputKey);
-                // grid.AddChild(takeProfitInput, 2, 2);
+                var sellButton = CreateTradeButton("SELL", Styles.CreateSellButtonStyle(), TradeType.Sell);
+                grid.AddChild(sellButton, 0, 2);
 
                 var closeAllButton = CreateCloseAllButton();
                 grid.AddChild(closeAllButton, 3, 0, 1, 3);
@@ -306,58 +186,25 @@ namespace cAlgo.Robots
                 return closeAllBorder;
             }
 
-            private Panel CreateInputWithLabel(string label, string defaultValue, string inputKey)
-            {
-                var stackPanel = new StackPanel 
-                {
-                    Orientation = Orientation.Vertical,
-                    Margin = "0 10 0 0"
-                };
-
-                var textBlock = new TextBlock 
-                {
-                    Text = label
-                };
-
-                var input = new TextBox 
-                {
-                    Margin = "0 5 0 0",
-                    Text = defaultValue,
-                    Style = Styles.CreateInputStyle()
-                };
-
-                _inputMap.Add(inputKey, input);
-
-                stackPanel.AddChild(textBlock);
-                stackPanel.AddChild(input);
-
-                return stackPanel;
-            }
-
             private void ExecuteMarketOrderAsync(TradeType tradeType)
             {
-                var lots = LotsSize;
+                var lots = _lotsSize;
                 if (lots <= 0)
                 {
                     _robot.Print(string.Format("{0} failed, invalid Lots", tradeType));
                     return;
                 }
 
-                var stopLossPips = StopLossPips;
-                var takeProfitPips = TakeProfitPips1;
+                var stopLossPips = _stopLossPips;
+                var takeProfitPips1 = _takeProfitPips1;
 
-                _robot.Print(string.Format("Open position with: LotsParameter: {0}, StopLossPipsParameter: {1}, TakeProfitPipsParameter: {2}", lots, stopLossPips, takeProfitPips));
+                _robot.Print(string.Format("Open position with: LotsParameter: {0}, StopLossPipsParameter: {1}, TakeProfitPipsParameter: {2}", lots, stopLossPips, takeProfitPips1));
 
                 var volume = _symbol.QuantityToVolumeInUnits(lots);
-                _robot.ExecuteMarketOrderAsync(tradeType, _symbol.Name, volume, "Trade Panel Sample", stopLossPips, takeProfitPips);
+                _robot.ExecuteMarketOrderAsync(tradeType, _symbol.Name, volume, "CTrade Manager Panel", stopLossPips, takeProfitPips1);
             }
 
-            private double GetValueFromInput(string inputKey, double defaultValue)
-            {
-                double value;
 
-                return double.TryParse(_inputMap[inputKey].Text, out value) ? value : defaultValue;
-            }
 
             private void CloseAll()
             {
