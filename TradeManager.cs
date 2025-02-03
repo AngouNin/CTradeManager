@@ -16,43 +16,51 @@ namespace cAlgo.Robots
         [Parameter("Horizontal Position", Group = "Panel alignment", DefaultValue = HorizontalAlignment.Left)]
         public HorizontalAlignment PanelHorizontalAlignment { get; set; }
 
-        [Parameter("Default Lots", Group = "Default trade parameters", DefaultValue = 0.01)]
+        [Parameter("Expert Name", Group = "Default trade parameters", DefaultValue = "Layering Trade Manager")]
+        public double ExpertName { get; set; }
+
+        [Parameter("Lots Size", Group = "Default trade parameters", DefaultValue = 0.01)]
         public double DefaultLots { get; set; }
 
-        [Parameter("Default Take Profit (pips)", Group = "Default trade parameters", DefaultValue = 200)]
+        [Parameter("Magic Number", Group = "Default trade parameters", DefaultValue = 1234)]
+        public double MagicNumber { get; set; }
+
+        [Parameter("Slippage Point", Group = "Default trade parameters", DefaultValue = 5)]
+        public double SlippagePoint { get; set; }
+
+        [Parameter("Buy Sell buttons for Execution", Group = "Default trade parameters", DefaultValue = true)]
+        public bool BuySellButtonsForExecution { get; set; }
+
+        [Parameter("Trendlines for Execution", Group = "Default trade parameters", DefaultValue = false)]
+        public bool TrendlinesForExecution { get; set; }
+
+        [Parameter("Take Profit 1", Group = "Default trade parameters", DefaultValue = 200)]
         public double DefaultTakeProfitPips1 { get; set; }
 
-        [Parameter("Default Take Profit (pips)", Group = "Default trade parameters", DefaultValue = 400)]
+        [Parameter("Take Profit 2", Group = "Default trade parameters", DefaultValue = 400)]
         public double DefaultTakeProfitPips2 { get; set; }
 
-        [Parameter("Default Take Profit (pips)", Group = "Default trade parameters", DefaultValue = 600)]
+        [Parameter("Take Profit 3", Group = "Default trade parameters", DefaultValue = 600)]
         public double DefaultTakeProfitPips3 { get; set; }
 
-        [Parameter("Default Take Profit (pips)", Group = "Default trade parameters", DefaultValue = 1000)]
+        [Parameter("Take Profit 4", Group = "Default trade parameters", DefaultValue = 1000)]
         public double DefaultTakeProfitPips4 { get; set; }
 
-        [Parameter("Default Stop Loss (pips)", Group = "Default trade parameters", DefaultValue = 500)]
+        [Parameter("Stop Loss", Group = "Default trade parameters", DefaultValue = 500)]
         public double DefaultStopLossPips { get; set; }
-        // Define button positions and text
-        // private const string BuyButtonName = "BuyButton";
-        // private const string SellButtonName = "SellButton";
 
-        // // Define the button size and positions
-        // private const int ButtonWidth = 100;
-        // private const int ButtonHeight = 30;
-        // private const int ButtonMargin = 10;
 
         protected override void OnStart()
         {
             // Draw Buy Button
-            DrawBuyButton();
+            DrawPanel();
 
             // Draw Sell Button
             // DrawSellButton();
         }
 
         // Function to draw the Buy Button
-        private void DrawBuyButton()
+        private void DrawPanel()
         {
             var tradingPanel = new TradingPanel(this, Symbol, DefaultLots, DefaultStopLossPips, DefaultTakeProfitPips1);
 
