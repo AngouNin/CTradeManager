@@ -20,7 +20,7 @@ namespace cAlgo.Robots
         public double ExpertName { get; set; }
 
         [Parameter("Lots Size", Group = "Default trade parameters", DefaultValue = 0.01)]
-        public double DefaultLots { get; set; }
+        public double LotsSize { get; set; }
 
         [Parameter("Magic Number", Group = "Default trade parameters", DefaultValue = 1234)]
         public double MagicNumber { get; set; }
@@ -35,19 +35,19 @@ namespace cAlgo.Robots
         public bool TrendlinesForExecution { get; set; }
 
         [Parameter("Take Profit 1", Group = "Default trade parameters", DefaultValue = 200)]
-        public double DefaultTakeProfitPips1 { get; set; }
+        public double TakeProfitPips1 { get; set; }
 
         [Parameter("Take Profit 2", Group = "Default trade parameters", DefaultValue = 400)]
-        public double DefaultTakeProfitPips2 { get; set; }
+        public double TakeProfitPips2 { get; set; }
 
         [Parameter("Take Profit 3", Group = "Default trade parameters", DefaultValue = 600)]
-        public double DefaultTakeProfitPips3 { get; set; }
+        public double TakeProfitPips3 { get; set; }
 
         [Parameter("Take Profit 4", Group = "Default trade parameters", DefaultValue = 1000)]
-        public double DefaultTakeProfitPips4 { get; set; }
+        public double TakeProfitPips4 { get; set; }
 
         [Parameter("Stop Loss", Group = "Default trade parameters", DefaultValue = 500)]
-        public double DefaultStopLossPips { get; set; }
+        public double StopLossPips { get; set; }
 
 
         protected override void OnStart()
@@ -62,7 +62,7 @@ namespace cAlgo.Robots
         // Function to draw the Buy Button
         private void DrawPanel()
         {
-            var tradingPanel = new TradingPanel(this, Symbol, DefaultLots, DefaultStopLossPips, DefaultTakeProfitPips1);
+            var tradingPanel = new TradingPanel(this, Symbol);
 
             var border = new Border 
             {
@@ -189,28 +189,31 @@ namespace cAlgo.Robots
 
         public class TradingPanel : CustomControl
         {
-            private const string LotsInputKey = "LotsKey";
-            private const string TakeProfitInputKey = "TPKey";
-            private const string StopLossInputKey = "SLKey";
+            // private const string LotsInputKey = "LotsKey";
+            // private const string TakeProfitInputKey = "TPKey";
+            // private const string StopLossInputKey = "SLKey";
             private readonly IDictionary<string, TextBox> _inputMap = new Dictionary<string, TextBox>();
             private readonly Robot _robot;
             private readonly Symbol _symbol;
+            public double LotsSize { get; set; }
+            public double StopLossPips { get; set; }
+            public double TakeProfitPips1 { get; set; }
 
-            public TradingPanel(Robot robot, Symbol symbol, double defaultLots, double defaultStopLossPips, double defaultTakeProfitPips)
+            public TradingPanel(Robot robot, Symbol symbol)
             {
                 _robot = robot;
                 _symbol = symbol;
-                AddChild(CreateTradingPanel(defaultLots, defaultStopLossPips, defaultTakeProfitPips));
+                AddChild(CreateTradingPanel());
             }
 
-            private ControlBase CreateTradingPanel(double defaultLots, double defaultStopLossPips, double defaultTakeProfitPips)
+            private ControlBase CreateTradingPanel()
             {
                 var mainPanel = new StackPanel();
 
                 var header = CreateHeader();
                 mainPanel.AddChild(header);
 
-                var contentPanel = CreateContentPanel(defaultLots, defaultStopLossPips, defaultTakeProfitPips);
+                var contentPanel = CreateContentPanel();
                 mainPanel.AddChild(contentPanel);
 
                 return mainPanel;
@@ -235,7 +238,7 @@ namespace cAlgo.Robots
                 return headerBorder;
             }
 
-            private StackPanel CreateContentPanel(double defaultLots, double defaultStopLossPips, double defaultTakeProfitPips)
+            private StackPanel CreateContentPanel()
             {
                 var contentPanel = new StackPanel 
                 {
@@ -250,14 +253,14 @@ namespace cAlgo.Robots
                 var buyButton = CreateTradeButton("BUY", Styles.CreateBuyButtonStyle(), TradeType.Buy);
                 grid.AddChild(buyButton, 0, 2);
 
-                var lotsInput = CreateInputWithLabel("Quantity (Lots)", defaultLots.ToString("F2"), LotsInputKey);
-                grid.AddChild(lotsInput, 1, 0, 1, 3);
+                // var lotsInput = CreateInputWithLabel("Quantity (Lots)", defaultLots.ToString("F2"), LotsInputKey);
+                // grid.AddChild(lotsInput, 1, 0, 1, 3);
 
-                var stopLossInput = CreateInputWithLabel("Stop Loss (Pips)", defaultStopLossPips.ToString("F1"), StopLossInputKey);
-                grid.AddChild(stopLossInput, 2, 0);
+                // var stopLossInput = CreateInputWithLabel("Stop Loss (Pips)", defaultStopLossPips.ToString("F1"), StopLossInputKey);
+                // grid.AddChild(stopLossInput, 2, 0);
 
-                var takeProfitInput = CreateInputWithLabel("Take Profit (Pips)", defaultTakeProfitPips.ToString("F1"), TakeProfitInputKey);
-                grid.AddChild(takeProfitInput, 2, 2);
+                // var takeProfitInput = CreateInputWithLabel("Take Profit (Pips)", defaultTakeProfitPips.ToString("F1"), TakeProfitInputKey);
+                // grid.AddChild(takeProfitInput, 2, 2);
 
                 var closeAllButton = CreateCloseAllButton();
                 grid.AddChild(closeAllButton, 3, 0, 1, 3);
@@ -333,15 +336,15 @@ namespace cAlgo.Robots
 
             private void ExecuteMarketOrderAsync(TradeType tradeType)
             {
-                var lots = GetValueFromInput(LotsInputKey, 0);
+                var lots = LotsSize;
                 if (lots <= 0)
                 {
                     _robot.Print(string.Format("{0} failed, invalid Lots", tradeType));
                     return;
                 }
 
-                var stopLossPips = GetValueFromInput(StopLossInputKey, 0);
-                var takeProfitPips = GetValueFromInput(TakeProfitInputKey, 0);
+                var stopLossPips = StopLossPips;
+                var takeProfitPips = TakeProfitPips1;
 
                 _robot.Print(string.Format("Open position with: LotsParameter: {0}, StopLossPipsParameter: {1}, TakeProfitPipsParameter: {2}", lots, stopLossPips, takeProfitPips));
 
