@@ -1,7 +1,6 @@
 using System;
 using cAlgo.API;
 using cAlgo.API.Internals;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace cAlgo.Robots
@@ -62,6 +61,12 @@ namespace cAlgo.Robots
         public double Layer3Distance { get; set; }
 
         // Trendline Filtering
+        [Parameter("Buy Trendline Color", Group = "Trendline Colors", DefaultValue = "DarkGreen")]
+        public string BuyTrendlineColor { get; set; }
+
+        [Parameter("Sell Trendline Color", Group = "Trendline Colors", DefaultValue = "Red")]
+        public string SellTrendlineColor { get; set; }
+
         [Parameter("Min Trendline Distance", DefaultValue = 20)]
         public double MinTrendlineDistance { get; set; }
 
@@ -82,6 +87,11 @@ namespace cAlgo.Robots
             if (UseButtons)
             {
                 DrawTradePanel();
+            }
+
+            if (UseTrendlines)
+            {
+                DrawTrendlines();
             }
         }
 
@@ -136,7 +146,19 @@ namespace cAlgo.Robots
                 }
                 else if (tradeType.HasValue)
                 {
-                    await ExecuteTradeAsync(tradeType.Value);                
+                   // Fetch the updated LotSize value dynamically
+                    double updatedLotSize = LotSize;
+                    Print("LotSize: {0}", updatedLotSize);
+
+                    // Normalize volume according to the symbol's rules
+                    double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
+
+                    Print("Executing {0} trade with volume {1}", tradeType.Value, minimumVolume);
+
+                    double volume = minimumVolume * LotSize * 100;
+
+                    // Execute the trade with the updated LotSize
+                    await ExecuteTradeAsync(tradeType.Value, volume);              
                 }
             };
 
@@ -151,32 +173,12 @@ namespace cAlgo.Robots
             }
         }
 
-        private async Task ExecuteTradeAsync(TradeType tradeType)
+        private async Task ExecuteTradeAsync(TradeType tradeType, double volume)
         {
-            // if (!IsTradeAllowed(tradeType)) return;
-
-            double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
             var position = ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
             await Task.Delay(ExecuteSecondsBeforeClose * 1000);
-            // ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
             PlacePendingOrders(tradeType);
         }
-
-        // private bool IsTradeAllowed(TradeType tradeType)
-        // {
-        //     double lastClose = Bars.ClosePrices.Last(1);
-        //     var lastCandle = Bars.LastBar;
-
-        //     double bodySize = Math.Abs(lastCandle.Close - lastCandle.Open);
-
-        //     // Validate body size criteria
-        //     if (bodySize > MaxCandleBodySize || bodySize < MinTrendlineDistance)
-        //         return false;
-
-        //     // Additional checks can go here based on your requirements
-
-        //     return true;
-        // }
 
         private void PlacePendingOrders(TradeType tradeType)
         {
@@ -197,6 +199,27 @@ namespace cAlgo.Robots
             }
         }
 
+        private void DrawTrendlines()
+        {
+            double currentPrice = Symbol.Bid;
+            double buyTrendlinePrice = currentPrice - (MinTrendlineDistance * Symbol.PipSize);
+            double sellTrendlinePrice = currentPrice + (MinTrendlineDistance * Symbol.PipSize);
+
+            var buyColor = Color.FromName(BuyTrendlineColor);
+            var sellColor = Color.FromName(SellTrendlineColor);
+
+            Chart.DrawTrendLine("BuyTrendline",
+                Server.Time.AddMinutes(-10), buyTrendlinePrice,
+                Server.Time.AddMinutes(10), buyTrendlinePrice, buyColor);
+
+            Chart.DrawTrendLine("SellTrendline",
+                Server.Time.AddMinutes(-10), sellTrendlinePrice,
+                Server.Time.AddMinutes(10), sellTrendlinePrice, sellColor);
+
+            Print("Trendlines Drawn: Buy at {0} ({1}), Sell at {2} ({3})", 
+                buyTrendlinePrice, BuyTrendlineColor, sellTrendlinePrice, SellTrendlineColor);
+        }
+
         protected override void OnBar()
         {
             if (!UseTrendlines) return;
@@ -205,27 +228,35 @@ namespace cAlgo.Robots
             var lastOpen = Bars.OpenPrices.Last(1);
             double bodySize = Math.Abs(lastClose - lastOpen) / Symbol.PipSize;
 
+            if (bodySize > MaxCandleBodySize)
+            {
+                Print("Candle body size {0} exceeds max allowed {1}", bodySize, MaxCandleBodySize);
+                return;
+            }
+
+            var buyColor = Color.FromName(BuyTrendlineColor);
+            var sellColor = Color.FromName(SellTrendlineColor);
+
             foreach (var obj in Chart.Objects)
             {
                 if (obj is ChartTrendLine trendline)
                 {
-                    bool isBuy = trendline.Color == Color.Green;
-                    bool isSell = trendline.Color == Color.Red;
+                    bool isBuyTrendline = trendline.Color == buyColor;
+                    bool isSellTrendline = trendline.Color == sellColor;
                     double trendlinePrice = trendline.Y1;
 
-                    // Validate candle body size before executing trade
-                    if (bodySize < MinTrendlineDistance || bodySize > MaxCandleBodySize)
-                        continue;
-
-                    if (isBuy && lastClose > trendlinePrice)
+                    if (isBuyTrendline && lastClose > trendlinePrice)
+                    {
                         ExecuteTrade(TradeType.Buy);
-
-                    if (isSell && lastClose < trendlinePrice)
+                        if (AutoDeleteTrendline) Chart.RemoveObject(trendline.Name);
+                        Print("Buy trendline-trade executed at {0}", trendlinePrice);
+                    }
+                    else if (isSellTrendline && lastClose < trendlinePrice)
+                    {
                         ExecuteTrade(TradeType.Sell);
-
-                    // Auto delete trendline to prevent multiple executions
-                    if (AutoDeleteTrendline)
-                        Chart.RemoveObject(trendline.Name);
+                        if (AutoDeleteTrendline) Chart.RemoveObject(trendline.Name);
+                        Print("Sell trendline-trade executed at {0}", trendlinePrice);
+                    }
                 }
             }
         }
@@ -233,7 +264,8 @@ namespace cAlgo.Robots
         private void ExecuteTrade(TradeType tradeType)
         {
             double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
-            ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
+            ExecuteMarketOrder(tradeType, SymbolName, volume, MagicNumber.ToString(), SL, TP1);
+            Print("Executed {0} trade with volume {1}", tradeType, volume);
             PlacePendingOrders(tradeType);
 
             // Check for break-even
