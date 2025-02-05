@@ -8,7 +8,7 @@ namespace cAlgo.Robots
     [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
     public class TradeManagerBot : Robot
     {
-         [Parameter("Vertical Position", Group = "Panel alignment", DefaultValue = VerticalAlignment.Top)]
+        [Parameter("Vertical Position", Group = "Panel alignment", DefaultValue = VerticalAlignment.Top)]
         public VerticalAlignment PanelVerticalAlignment { get; set; }
 
         [Parameter("Horizontal Position", Group = "Panel alignment", DefaultValue = HorizontalAlignment.Left)]
@@ -59,6 +59,16 @@ namespace cAlgo.Robots
 
         [Parameter("Layer 3 Distance", DefaultValue = 150)]
         public double Layer3Distance { get; set; }
+
+        // Trendline Filtering
+        [Parameter("Min Trendline Distance", DefaultValue = 20)]
+        public double MinTrendlineDistance { get; set; }
+
+        [Parameter("Max Candle Body Size", DefaultValue = 600)]
+        public double MaxCandleBodySize { get; set; }
+
+        [Parameter("Delete Trendline after Trade", DefaultValue = true)]
+        public bool AutoDeleteTrendline { get; set; }
 
         protected override void OnStart()
         {
@@ -135,7 +145,7 @@ namespace cAlgo.Robots
 
         private void ExecuteTrade(TradeType tradeType)
         {
-            double volume = Symbol.VolumeInUnitsToQuantity(LotSize);
+            double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
             ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
             PlacePendingOrders(tradeType);
         }
@@ -144,18 +154,18 @@ namespace cAlgo.Robots
         {
             if (EnableLayer2)
             {
-                double price = tradeType == TradeType.Buy 
+                double layer2Price = tradeType == TradeType.Buy 
                 ? Symbol.Ask + Layer2Distance * Symbol.PipSize 
                 : Symbol.Bid - Layer2Distance * Symbol.PipSize;
-                PlaceLimitOrder(tradeType, SymbolName, LotSize, price, "Layer2");
+                PlaceLimitOrder(tradeType, SymbolName, LotSize, layer2Price, "Layer2");
             }
 
             if (EnableLayer3)
             {
-                double price = tradeType == TradeType.Buy 
+                double layer3Price = tradeType == TradeType.Buy 
                 ? Symbol.Ask + Layer3Distance * Symbol.PipSize 
                 : Symbol.Bid - Layer3Distance * Symbol.PipSize;
-                PlaceLimitOrder(tradeType, SymbolName, LotSize, price, "Layer3");
+                PlaceLimitOrder(tradeType, SymbolName, LotSize, layer3Price, "Layer3");
             }
         }
 
@@ -163,19 +173,31 @@ namespace cAlgo.Robots
         {
             if (!UseTrendlines) return;
 
-            var lastBar = Bars.ClosePrices.Last(1);
+            var lastClose = Bars.ClosePrices.Last(1);
+            var lastOpen = Bars.OpenPrices.Last(1);
+            double bodySize = Math.Abs(lastClose - lastOpen) / Symbol.PipSize;
+
             foreach (var obj in Chart.Objects)
             {
                 if (obj is ChartTrendLine trendline)
                 {
-                    if (trendline.Color.Equals(Color.Green) && lastBar > trendline.Y1)
-                    {
+                    bool isBuy = trendline.Color == Color.Green;
+                    bool isSell = trendline.Color == Color.Red;
+                    double trendlinePrice = trendline.Y1;
+
+                    // Validate candle body size before executing trade
+                    if (bodySize < MinTrendlineDistance || bodySize > MaxCandleBodySize)
+                        continue;
+
+                    if (isBuy && lastClose > trendlinePrice)
                         ExecuteTrade(TradeType.Buy);
-                    }
-                    else if (trendline.Color.Equals(Color.Red) && lastBar < trendline.Y1)
-                    {
+
+                    if (isSell && lastClose < trendlinePrice)
                         ExecuteTrade(TradeType.Sell);
-                    }
+
+                    // Auto delete trendline to prevent multiple executions
+                    if (AutoDeleteTrendline)
+                        Chart.RemoveObject(trendline.Name);
                 }
             }
         }
