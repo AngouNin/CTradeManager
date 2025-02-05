@@ -2,6 +2,7 @@ using System;
 using cAlgo.API;
 using cAlgo.API.Internals;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace cAlgo.Robots
 {
@@ -67,6 +68,12 @@ namespace cAlgo.Robots
         [Parameter("Max Candle Body Size", DefaultValue = 600)]
         public double MaxCandleBodySize { get; set; }
 
+        [Parameter("Execute Seconds Before Candle Close", DefaultValue = 2)]
+        public int ExecuteSecondsBeforeClose { get; set; }
+
+        [Parameter("Buffer Points for BE", DefaultValue = 10)]
+        public double BufferPointsBE { get; set; }
+
         [Parameter("Delete Trendline after Trade", DefaultValue = true)]
         public bool AutoDeleteTrendline { get; set; }
 
@@ -92,6 +99,7 @@ namespace cAlgo.Robots
 
             var sellButton = CreateTradeButton("SELL", Color.Red, TradeType.Sell);
             sellButton.Style = CreateSellButtonStyle();
+
             var closeAllButton = CreateTradeButton("CLOSE ALL", Color.Orange, null, true);
             closeAllButton.Style = CreateCloseButtonStyle();
 
@@ -120,7 +128,7 @@ namespace cAlgo.Robots
                 Height = 25
             };
 
-            button.Click += args =>
+            button.Click += async args =>
             {
                 if (closeAll)
                 {
@@ -128,7 +136,7 @@ namespace cAlgo.Robots
                 }
                 else if (tradeType.HasValue)
                 {
-                    ExecuteTrade(tradeType.Value);
+                    await ExecuteTradeAsync(tradeType.Value);                
                 }
             };
 
@@ -143,12 +151,32 @@ namespace cAlgo.Robots
             }
         }
 
-        private void ExecuteTrade(TradeType tradeType)
+        private async Task ExecuteTradeAsync(TradeType tradeType)
         {
+            // if (!IsTradeAllowed(tradeType)) return;
+
             double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
-            ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
+            var position = ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
+            await Task.Delay(ExecuteSecondsBeforeClose * 1000);
+            // ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
             PlacePendingOrders(tradeType);
         }
+
+        // private bool IsTradeAllowed(TradeType tradeType)
+        // {
+        //     double lastClose = Bars.ClosePrices.Last(1);
+        //     var lastCandle = Bars.LastBar;
+
+        //     double bodySize = Math.Abs(lastCandle.Close - lastCandle.Open);
+
+        //     // Validate body size criteria
+        //     if (bodySize > MaxCandleBodySize || bodySize < MinTrendlineDistance)
+        //         return false;
+
+        //     // Additional checks can go here based on your requirements
+
+        //     return true;
+        // }
 
         private void PlacePendingOrders(TradeType tradeType)
         {
@@ -199,6 +227,48 @@ namespace cAlgo.Robots
                     if (AutoDeleteTrendline)
                         Chart.RemoveObject(trendline.Name);
                 }
+            }
+        }
+
+        private void ExecuteTrade(TradeType tradeType)
+        {
+            double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
+            ExecuteMarketOrder(tradeType, SymbolName, volume, "Layer1", SL, TP1);
+            PlacePendingOrders(tradeType);
+
+            // Check for break-even
+            double currentPrice = tradeType == TradeType.Buy ? Symbol.Ask : Symbol.Bid;
+            Position position = null;
+            foreach (var pos in Positions)
+            {
+                if (pos.Label == "Layer1")
+                {
+                    position = pos;
+                    break;
+                }
+            }
+            if (position != null)
+            {
+                double entryPrice = position.EntryPrice;
+
+                if (tradeType == TradeType.Buy && currentPrice - entryPrice > BufferPointsBE * Symbol.PipSize)
+                {
+                    AdjustForBreakEven(position, tradeType);
+                }
+                else if (tradeType == TradeType.Sell && entryPrice - currentPrice > BufferPointsBE * Symbol.PipSize)
+                {
+                    AdjustForBreakEven(position, tradeType);
+                }
+            }
+            
+        }
+
+        private void AdjustForBreakEven(Position position, TradeType tradeType)
+        {
+            if (position != null)
+            {
+                double newSL = position.EntryPrice;
+                ModifyPosition(position, newSL, position.TakeProfit, ProtectionType.None);
             }
         }
 
