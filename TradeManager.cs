@@ -149,14 +149,10 @@ namespace cAlgo.Robots
                    // Fetch the updated LotSize value dynamically
                     double updatedLotSize = LotSize;
                     Print("LotSize: {0}", updatedLotSize);
-
                     // Normalize volume according to the symbol's rules
                     double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
-
-                    Print("Executing {0} trade with volume {1}", tradeType.Value, minimumVolume);
-
                     double volume = minimumVolume * LotSize * 100;
-
+                    Print("Executing {0} trade with volume {1}", tradeType.Value, volume);
                     // Execute the trade with the updated LotSize
                     await ExecuteTradeAsync(tradeType.Value, volume);              
                 }
@@ -263,7 +259,11 @@ namespace cAlgo.Robots
 
         private void ExecuteTrade(TradeType tradeType)
         {
-            double volume = Symbol.NormalizeVolumeInUnits(LotSize, RoundingMode.Up);
+            double updatedLotSize = LotSize;
+            Print("LotSize: {0}", updatedLotSize);
+            // Normalize volume according to the symbol's rules
+            double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
+            double volume = minimumVolume * LotSize * 100; 
             ExecuteMarketOrder(tradeType, SymbolName, volume, MagicNumber.ToString(), SL, TP1);
             Print("Executed {0} trade with volume {1}", tradeType, volume);
             PlacePendingOrders(tradeType);
