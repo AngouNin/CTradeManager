@@ -92,7 +92,7 @@ namespace cAlgo.Robots
         [Parameter("Lot Multiplier", Group = "First Layer", DefaultValue = 1)]
         public double LotMultiplierLayer1 { get; set; }
 
-        [Parameter("Total Number of Trades for Layer 1", Group = "First Layer", DefaultValue = 3)]
+        [Parameter("Total Number of Trades for Layer 1", Group = "First Layer", DefaultValue = 5)]
         public int TradesLayer1 { get; set; }
 
         [Parameter("Number of Trades for TP 1", Group = "First Layer", DefaultValue = 1)]
@@ -131,7 +131,7 @@ namespace cAlgo.Robots
         [Parameter("Points Distance", Group = "Second Layer", DefaultValue = 150)]
         public double Layer2Distance { get; set; }
 
-        [Parameter("Total Number of Trades for Layer 2", Group = "Second Layer", DefaultValue = 5)]
+        [Parameter("Total Number of Trades for Layer 2", Group = "Second Layer", DefaultValue = 6)]
         public int TradesLayer2 { get; set; }
 
         [Parameter("Number of Trades when reach first Layer", Group = "Second Layer", DefaultValue = 2)]
@@ -183,7 +183,7 @@ namespace cAlgo.Robots
         [Parameter("Points Distance", Group = "Third Layer", DefaultValue = 150)]
         public double Layer3Distance { get; set; }
 
-        [Parameter("Total Number of Trades for Layer 3", Group = "Third Layer", DefaultValue = 8)]
+        [Parameter("Total Number of Trades for Layer 3", Group = "Third Layer", DefaultValue = 11)]
         public int TradesLayer3 { get; set; }
 
         [Parameter("Number of Trades when reach second Layer", Group = "Third Layer", DefaultValue = 4)]
@@ -253,9 +253,18 @@ namespace cAlgo.Robots
                 DrawTradePanel();
             }
 
+            // if (UseTrendlines)
+            // {
+            //     DrawTrendlines();
+            // }
+        }
+
+        protected override void OnTick()
+        {
             if (UseTrendlines)
             {
                 DrawTrendlines();
+                ExecuteTrendlineTrades();
             }
         }
 
@@ -340,25 +349,6 @@ namespace cAlgo.Robots
             PlacePendingOrders(tradeType);
         }
 
-        private void PlacePendingOrders(TradeType tradeType)
-        {
-            if (ActivateLayer2)
-            {
-                double layer2Price = tradeType == TradeType.Buy 
-                ? Symbol.Ask + Layer2Distance * Symbol.PipSize 
-                : Symbol.Bid - Layer2Distance * Symbol.PipSize;
-                PlaceLimitOrder(tradeType, SymbolName, LotSize, layer2Price, "Layer2");
-            }
-
-            if (ActivateLayer3)
-            {
-                double layer3Price = tradeType == TradeType.Buy 
-                ? Symbol.Ask + Layer3Distance * Symbol.PipSize 
-                : Symbol.Bid - Layer3Distance * Symbol.PipSize;
-                PlaceLimitOrder(tradeType, SymbolName, LotSize, layer3Price, "Layer3");
-            }
-        }
-
         private void DrawTrendlines()
         {
             double currentPrice = Symbol.Bid;
@@ -380,7 +370,25 @@ namespace cAlgo.Robots
                 buyTrendlinePrice, BuyTrendlineColor, sellTrendlinePrice, SellTrendlineColor);
         }
 
-        protected override void OnBar()
+        //  private void ExecuteTrendlineTrades()
+        // {
+        //     foreach (var trendline in ChartObjects.TrendLines)
+        //     {
+        //         if (trendline.Color == Colors.DarkGreen && MarketSeries.Close.LastValue > trendline.EndY)
+        //         {
+        //             ExecuteTrade(TradeType.Buy);
+        //             ChartObjects.RemoveObject(trendline.Name);
+        //         }
+        //         else if (trendline.Color == Colors.Red && MarketSeries.Close.LastValue < trendline.EndY)
+        //         {
+        //             ExecuteTrade(TradeType.Sell);
+        //             ChartObjects.RemoveObject(trendline.Name);
+        //         }
+        //     }
+        // }
+
+
+        private void ExecuteTrendlineTrades()
         {
             if (!UseTrendlines) return;
 
@@ -457,6 +465,43 @@ namespace cAlgo.Robots
                 }
             }
             
+        }
+
+        private void PlacePendingOrders(TradeType tradeType)
+        {
+            if (ActivateLayer2)
+            {
+                double layer2Price = tradeType == TradeType.Buy 
+                ? Symbol.Ask + Layer2Distance * Symbol.PipSize 
+                : Symbol.Bid - Layer2Distance * Symbol.PipSize;
+                PlaceLimitOrder(tradeType, layer2Price, TradesLayer2);
+            }
+
+            if (ActivateLayer3)
+            {
+                double layer3Price = tradeType == TradeType.Buy 
+                ? Symbol.Ask + (Layer2Distance+ Layer3Distance) * Symbol.PipSize 
+                : Symbol.Bid - (Layer2Distance+ Layer3Distance) * Symbol.PipSize;
+                PlaceLimitOrder(tradeType, layer3Price, TradesLayer3);
+            }
+        }
+
+        private void PlaceLimitOrder(TradeType tradeType, double price, int quantity)
+        {
+            for (int i = 0; i < quantity; i++)
+            {
+                double updatedLotSize = LotSize;
+                Print("LotSize: {0}", updatedLotSize);
+                // Normalize volume according to the symbol's rules
+                double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
+                double volume = minimumVolume * LotSize * 100;
+                PlaceLimitOrder(tradeType, SymbolName, volume, price, MagicNumber, SL, TP1);
+            }
+        }
+
+        private void PlaceLimitOrder(TradeType tradeType, string symbolName, double volume, double price, int magicNumber, double sL, double tP1)
+        {
+            throw new NotImplementedException();
         }
 
         private void AdjustForBreakEven(Position position, TradeType tradeType)
