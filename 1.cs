@@ -310,12 +310,10 @@ namespace cAlgo.Robots
                 {
                     if (tradeType.Value == TradeType.Buy)
                     {
-                        Print("Buy trade button click!");
                         ExecuteBuyTrades();
                     }
                     else if (tradeType.Value == TradeType.Sell)
                     {
-                        Print("Sell trade button click!");
                         ExecuteSellTrades();
                     }
                 }
@@ -338,11 +336,10 @@ namespace cAlgo.Robots
             // Fetch the updated LotSize value dynamically
             double updatedLotSize = LotSize;
             Print("LotSize:=> {0}", updatedLotSize);
-            Print("Symbol: {0}", Symbol);
             // Normalize volume according to the symbol's rules
             double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
-            Print("Executing Buy trade with volume {0}", minimumVolume);
             double volume = minimumVolume * LotSize * 100;
+            Print("Executing Buy trade with volume {1}", volume);
 
             // Layer 1 
             for (int i = 1; i <= TradesLayer1; i++)
@@ -382,6 +379,7 @@ namespace cAlgo.Robots
             // Normalize volume according to the symbol's rules
             double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
             double volume = minimumVolume * LotSize * 100;
+            Print("Executing Sell trade with volume {1}", volume);
 
             // Layer 1 
             for (int i = 1; i <= TradesLayer1; i++)
@@ -436,39 +434,7 @@ namespace cAlgo.Robots
 
         private void MonitorTrendlines()
         {
-            // Create trendlines for buying and selling
-            double currentPrice = Symbol.Bid;
-            double buyTrendlinePrice = currentPrice - (MinTrendlineDistance * Symbol.PipSize);
-            double sellTrendlinePrice = currentPrice + (MinTrendlineDistance * Symbol.PipSize);
-
-            var buyColor = Color.FromName(BuyTrendlineColor.ToString());
-            var sellColor = Color.FromName(SellTrendlineColor.ToString());
-
-            var buyTrendline = Chart.DrawTrendLine("BuyTrendline",
-                Server.Time.AddMinutes(-10), buyTrendlinePrice,
-                Server.Time.AddMinutes(10), buyTrendlinePrice, buyColor);
-
-            var sellTrendline = Chart.DrawTrendLine("SellTrendline",
-                Server.Time.AddMinutes(-10), sellTrendlinePrice,
-                Server.Time.AddMinutes(10), sellTrendlinePrice, sellColor);
-
-            Print("Trendlines Drawn: Buy at {0} ({1}), Sell at {2} ({3})", 
-                buyTrendlinePrice, BuyTrendlineColor, sellTrendlinePrice, SellTrendlineColor);
-
-            var lastClose = Bars.ClosePrices.Last(1);
-            var lastCandle = Bars.LastBar;
-
-            // Check for closing of the candle above the buy trendline
-            if (lastCandle.Close > buyTrendline.Y1 && lastCandle.Close == lastClose)
-            {
-                ExecuteBuyTrades();
-            }
-
-            // Check for closing of the candle below the sell trendline
-            if (lastCandle.Close < sellTrendline.Y1 && lastCandle.Close == lastClose)
-            {
-                ExecuteSellTrades();
-            }
+            // Implement logic to listen for trendline crossings and trigger trades
         }
 
         protected override void OnTick()
@@ -479,261 +445,14 @@ namespace cAlgo.Robots
 
         private void ManageOpenPositions()
         {
-            // Get all positions for this symbol with the specific magic number
-            var positions = Positions.FindAll(SymbolName, MagicNumber.ToString());
-            
-            double bufferPointsBE1 = BufferPointsBE1 * Symbol.PipSize; 
-            double bufferPointsBE2 = BufferPointsBE2 * Symbol.PipSize; 
-            double bufferPointsBE3 = BufferPointsBE3 * Symbol.PipSize; 
-
-            double firstLayerPrice = 0;
-            double secondLayerPrice = 0;
-
-            foreach (var position in positions)
-            {
-                // Check if the position is for buying
-                if (position.TradeType == TradeType.Buy)
-                {
-                    // Save first layer price on first successful trade
-                    if (firstLayerPrice == 0)
-                    {
-                        firstLayerPrice = position.EntryPrice;
-                    }
-
-                    if (secondLayerPrice == 0)
-                    {
-                        secondLayerPrice = position.EntryPrice;
-                    }
-
-                    // Check for take profit levels
-                    if (position.Pips >= TP1)
-                    {
-                        ClosePosition(position); // Close if TP1 is hit
-                        if (DeleteAllPendingOrdersAt == DeleteAllPendingOrders.TP)
-                        {
-                            DeletePendingOrders();
-                        }
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips >= TP2)
-                    {
-                        ClosePosition(position); // Close if TP2 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips >= TP3)
-                    {
-                        ClosePosition(position); // Close if TP3 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips >= TP4)
-                    {
-                        ClosePosition(position); // Close if TP4 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    // Manage Breakeven for Layer 1
-                    if (SetBreakevenLayer1 == SetBreakeven1.TP1 && position.Pips >= bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP2 && position.Pips >= bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP3 && position.Pips >= bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP4 && position.Pips >= bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-
-                    // Manage Breakeven for Layer 2
-                    if (SetBreakevenLayer2 == SetBreakeven2.FirstLayer && position.Pips >= bufferPointsBE2)
-                    {
-                        ModifyPosition(position, firstLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP1 && position.Pips >= bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP2 && position.Pips >= bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP3 && position.Pips >= bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP4 && position.Pips >= bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-
-                    // Manage Breakeven for Layer 3
-                    if (SetBreakevenLayer3 == SetBreakeven3.FirstLayer && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, firstLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.SecondLayer && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, secondLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP1 && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP2 && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP3 && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP4 && position.Pips >= bufferPointsBE3)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                }
-                else if (position.TradeType == TradeType.Sell)
-                {
-                    // Save first layer price on first successful trade
-                    if (firstLayerPrice == 0)
-                    {
-                        firstLayerPrice = position.EntryPrice;
-                    }
-
-                    if (secondLayerPrice == 0)
-                    {
-                        secondLayerPrice = position.EntryPrice;
-                    }
-
-                    // Check for sell positions take profit levels
-                    if (position.Pips <= -TP1)
-                    {
-                        ClosePosition(position); // Close if TP1 is hit
-                        if (DeleteAllPendingOrdersAt == DeleteAllPendingOrders.TP)
-                        {
-                            DeletePendingOrders();
-                        }
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips <= -TP2)
-                    {
-                        ClosePosition(position); // Close if TP2 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips <= -TP3)
-                    {
-                        ClosePosition(position); // Close if TP3 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    if (position.Pips <= -TP4)
-                    {
-                        ClosePosition(position); // Close if TP4 is hit
-                        continue; // Proceed to the next position
-                    }
-
-                    // Manage Breakeven for Layer 1
-                    if (SetBreakevenLayer1 == SetBreakeven1.TP1 && position.Pips >= -bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP2 && position.Pips >= -bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP3 && position.Pips >= -bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer1 == SetBreakeven1.TP4 && position.Pips >= -bufferPointsBE1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-
-                    // Manage Breakeven for Layer 2
-                    if (SetBreakevenLayer2 == SetBreakeven2.FirstLayer && position.Pips >= -bufferPointsBE2)
-                    {
-                        ModifyPosition(position, firstLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP1 && position.Pips >= -bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP2 && position.Pips >= -bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP3 && position.Pips >= -bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer2 == SetBreakeven2.TP4 && position.Pips >= -bufferPointsBE2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-
-                    // Manage Breakeven for Layer 3
-                    if (SetBreakevenLayer3 == SetBreakeven3.FirstLayer && position.Pips <= -bufferPointsBE3)
-                    {
-                        ModifyPosition(position, firstLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.SecondLayer && position.Pips <= -bufferPointsBE3)
-                    {
-                        ModifyPosition(position, secondLayerPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP1 && position.Pips <= -TP1)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP2 && position.Pips <= -TP2)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP3 && position.Pips <= -TP3)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                    else if (SetBreakevenLayer3 == SetBreakeven3.TP4 && position.Pips <= -TP4)
-                    {
-                        ModifyPosition(position, position.EntryPrice, position.TakeProfit, ProtectionType.None);
-                    }
-                }
-            }
+            // Implement the logic to check existing positions, trigger closings, and manage SL/TP adjustments based on layers
         }
 
-        private void DeletePendingOrders()
-        {
-            // Get all pending orders for this symbol with the specific magic number
-            foreach (var order in PendingOrders)
-            {
-                if (order.SymbolName == SymbolName && order.Label == MagicNumber.ToString())
-                {
-                    CancelPendingOrder(order);
-                }
-            }
-        }
+        // Implement additional methods and logic as per your requirements
 
         protected override void OnStop()
         {
-            // Clean up actions (e.g., close open positions or remove trendlines)
-            foreach (var position in Positions.FindAll(SymbolName, MagicNumber.ToString()))
-            {
-                ClosePosition(position);
-            }
-
-            // Optionally delete trendlines from the chart
-            Chart.RemoveObject("BuyTrendline");
-            Chart.RemoveObject("SellTrendline");
+            // Cleanup actions if needed, such as closing orders or removing buttons
         }
         private static Style CreatePanelStyle()
         {
