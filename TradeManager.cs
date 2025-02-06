@@ -341,13 +341,14 @@ namespace cAlgo.Robots
             Print("Symbol: {0}", Symbol);
             // Normalize volume according to the symbol's rules
             double minimumVolume = Symbol.NormalizeVolumeInUnits(1, RoundingMode.Up);
-            Print("Executing Buy trade with volume {0}", minimumVolume);
             double volume = minimumVolume * LotSize * 100;
-
+            Print("Executing Buy trade with volume {0}", volume);
             // Layer 1 
+            Print("Total  Number of Trades for Layer 1 ==> {0}", TradesLayer1);
             for (int i = 1; i <= TradesLayer1; i++)
             {
                 var tradeResult = ExecuteMarketOrder(TradeType.Buy, SymbolName, volume*LotMultiplierLayer1, MagicNumber.ToString());
+                Print("Trade Result: {0}", tradeResult);
                 if (tradeResult.IsSuccessful)
                 {
                     var position = tradeResult.Position;
@@ -357,17 +358,21 @@ namespace cAlgo.Robots
             }
 
             // Layer 2
+            Print("Total  Number of Trades for Layer 2 ==> {0}", TradesLayer2);
             for (int i = 1; i <= TradesLayer2; i++)
             {
                 double layer2Price = Symbol.Ask + Layer2Distance * Symbol.PipSize;
                 PlaceLimitOrder(TradeType.Buy, SymbolName, volume*LotMultiplierLayer2, layer2Price, "Layer2");
+                Print("Layer 2 Price: {0}", layer2Price);
             }
 
             // Layer 3
+            Print("Total  Number of Trades for Layer 3 ==> {0}", TradesLayer3);
             for (int i = 1; i <= TradesLayer3; i++)
             {
                 double layer3Price = Symbol.Ask + Layer3Distance * Symbol.PipSize; // Adjust for Layer 3
                 PlaceLimitOrder(TradeType.Buy, SymbolName, volume*LotMultiplierLayer3, layer3Price, "Layer3");
+                Print("Layer 3 Price: {0}", layer3Price);
             }
         }
 
@@ -384,39 +389,90 @@ namespace cAlgo.Robots
             double volume = minimumVolume * LotSize * 100;
 
             // Layer 1 
+            Print("Total  Number of Trades for Layer 1 ==> {0}", TradesLayer1);
             for (int i = 1; i <= TradesLayer1; i++)
             {
                 var tradeResult = ExecuteMarketOrder(TradeType.Buy, SymbolName, volume*LotMultiplierLayer1, MagicNumber.ToString());
                 if (tradeResult.IsSuccessful)
                 {
                     var position = tradeResult.Position;
+                    Print("Trade Result: {0}", tradeResult);
                     // Handle SL and TPs
                     SetStopLossAndTakeProfits(position, (int)TP1, (int)TP2, (int)TP3, (int)TP4, (int)StopLoss);
                 }
             }
 
             // Layer 2
+            Print("Total  Number of Trades for Layer 2 ==> {0}", TradesLayer2);
             for (int i = 1; i <= TradesLayer2; i++)
             {
                 double layer2Price = Symbol.Bid - Layer2Distance * Symbol.PipSize;
                 PlaceLimitOrder(TradeType.Sell, SymbolName, volume*LotMultiplierLayer2, layer2Price, "Layer2");
+                Print("Layer 2 Price: {0}", layer2Price);
             }
 
             // Layer 3
+            Print("Total  Number of Trades for Layer 3 ==> {0}", TradesLayer3);
             for (int i = 1; i <= TradesLayer3; i++)
             {
                 double layer3Price = Symbol.Bid - Layer3Distance * Symbol.PipSize; // Adjust for Layer 3
                 PlaceLimitOrder(TradeType.Sell, SymbolName, volume*LotMultiplierLayer3, layer3Price, "Layer3");
+                Print("Layer 3 Price: {0}", layer3Price);
             }
         }
 
         private void SetStopLossAndTakeProfits(Position position, int tp1, int tp2, int tp3, int tp4, int stopLoss)
         {
-            double slPrice = position.EntryPrice - stopLoss * Symbol.PipSize;
-            ModifyPosition(position, slPrice, position.EntryPrice + tp1 * Symbol.PipSize, ProtectionType.None);
-            
-            // Set additional TPs logic
+            if (position == null)
+                return;
+
+            double slPrice, tp1Price, tp2Price, tp3Price, tp4Price;
+
+            if (position.TradeType == TradeType.Buy)
+            {
+                slPrice = position.EntryPrice - stopLoss * Symbol.PipSize;
+                tp1Price = position.EntryPrice + tp1 * Symbol.PipSize;
+                tp2Price = position.EntryPrice + tp2 * Symbol.PipSize;
+                tp3Price = position.EntryPrice + tp3 * Symbol.PipSize;
+                tp4Price = position.EntryPrice + tp4 * Symbol.PipSize;
+            }
+            else
+            {
+                slPrice = position.EntryPrice + stopLoss * Symbol.PipSize;
+                tp1Price = position.EntryPrice - tp1 * Symbol.PipSize;
+                tp2Price = position.EntryPrice - tp2 * Symbol.PipSize;
+                tp3Price = position.EntryPrice - tp3 * Symbol.PipSize;
+                tp4Price = position.EntryPrice - tp4 * Symbol.PipSize;
+            }
+
+            // Modify main position with SL and the first TP
+            ModifyPosition(position, slPrice, tp1Price, ProtectionType.None);
+
+            // Create partial close orders for other TPs
+            int remainingVolume = (int)position.VolumeInUnits;
+            int volumeForTP1 = (int)(remainingVolume * FirstLayerNumberOfTradesForTP1 / TradesLayer1);
+            int volumeForTP2 = (int)(remainingVolume * FirstLayerNumberOfTradesForTP2 / TradesLayer1);
+            int volumeForTP3 = (int)(remainingVolume * FirstLayerNumberOfTradesForTP3 / TradesLayer1);
+            int volumeForTP4 = (int)(remainingVolume * FirstLayerNumberOfTradesForTP4 / TradesLayer1);
+
+            if (volumeForTP2 > 0)
+                PlaceTakeProfitOrder(position.TradeType, volumeForTP2, tp2Price, "TP2");
+
+            if (volumeForTP3 > 0)
+                PlaceTakeProfitOrder(position.TradeType, volumeForTP3, tp3Price, "TP3");
+
+            if (volumeForTP4 > 0)
+                PlaceTakeProfitOrder(position.TradeType, volumeForTP4, tp4Price, "TP4");
         }
+
+        private void PlaceTakeProfitOrder(TradeType tradeType, int volume, double price, string label)
+        {
+            if (tradeType == TradeType.Buy)
+                PlaceLimitOrder(TradeType.Sell, SymbolName, volume, price, label);
+            else
+                PlaceLimitOrder(TradeType.Buy, SymbolName, volume, price, label);
+        }
+
 
         private bool IsTradeAllowed(TradeType tradeType)
         {
